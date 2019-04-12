@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/v2/eds.pb.h"
+#include "envoy/config/config_provider_manager.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/xds_grpc_context.h"
@@ -89,6 +90,27 @@ public:
   MOCK_METHOD1(onDiscoveryResponse,
                void(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message));
   MOCK_METHOD0(onWriteable, void());
+};
+
+class MockConfigProviderManager : public ConfigProviderManager {
+public:
+  MockConfigProviderManager() = default;
+  ~MockConfigProviderManager() override = default;
+
+  MOCK_METHOD4(createXdsConfigProvider,
+               ConfigProviderPtr(const Protobuf::Message& config_source_proto,
+                                 Server::Configuration::FactoryContext& factory_context,
+                                 const std::string& stat_prefix,
+                                 const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
+  MOCK_METHOD3(createStaticConfigProvider,
+               ConfigProviderPtr(const Protobuf::Message& config_proto,
+                                 Server::Configuration::FactoryContext& factory_context,
+                                 const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
+  MOCK_METHOD3(
+      createStaticConfigProvider,
+      ConfigProviderPtr(std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,
+                        Server::Configuration::FactoryContext& factory_context,
+                        const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
 };
 
 } // namespace Config

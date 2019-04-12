@@ -1,5 +1,7 @@
 #pragma once
 
+#include <assert.h>
+
 #include <memory>
 
 #include "envoy/common/time.h"
@@ -42,6 +44,23 @@ public:
   using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
   /**
+   * The type of API represented by a ConfigProvider.
+   */
+  enum class ApiType {
+    /**
+     * A "Full" API delivers a complete configuration as part of each resource (top level
+     * config proto); i.e., each resource contains the whole representation of the config intent. An
+     * example of this type of API is RDS.
+     */
+    Full,
+    /**
+     * A "Delta" API delivers a subset of the config intent as part of each resource (top level
+     * config proto). Examples of this type of API are CDS, LDS and SRDS.
+     */
+    Delta
+  };
+
+  /**
    * Stores the config proto as well as the associated version.
    */
   template <typename P> struct ConfigProtoInfo {
@@ -51,10 +70,26 @@ public:
     std::string version_;
   };
 
+  using ConfigProtoVector = std::vector<const Protobuf::Message*>;
+  /**
+   * Stores the config protos associated with a "Delta" API.
+   */
+  struct ConfigProtoInfoVector {
+    const ConfigProtoVector config_protos_;
+
+    // Only populated by dynamic config providers.
+    std::string version_;
+  };
+
   virtual ~ConfigProvider() = default;
 
   /**
-   * Returns a ConfigProtoInfo associated with the provider.
+   * The type of API.
+   */
+  virtual ApiType apiType() const PURE;
+
+  /**
+   * Returns a ConfigProtoInfo associated with a ApiType::Full provider.
    * @return absl::optional<ConfigProtoInfo<P>> an optional ConfigProtoInfo; the value is set when a
    * config is available.
    */
@@ -67,6 +102,19 @@ public:
       return absl::nullopt;
     }
     return ConfigProtoInfo<P>{*config_proto, getConfigVersion()};
+  }
+
+  /**
+   * Returns a ConfigProtoInfoVector associated with a ApiType::Delta provider.
+   * @return absl::optional<ConfigProtoInfoVector> an optional ConfigProtoInfoVector; the value is
+   * set when a config is available.
+   */
+  absl::optional<ConfigProtoInfoVector> configProtoInfoVector() const {
+    const ConfigProtoVector config_protos = getConfigProtos();
+    if (config_protos.empty()) {
+      return absl::nullopt;
+    }
+    return ConfigProtoInfoVector{std::move(config_protos), getConfigVersion()};
   }
 
   /**
@@ -92,7 +140,20 @@ protected:
    * @return Protobuf::Message* the config proto corresponding to the Config instantiated by the
    *         provider.
    */
-  virtual const Protobuf::Message* getConfigProto() const PURE;
+  virtual const Protobuf::Message* getConfigProto() const {
+    assert("not implemented" && false);
+    return nullptr;
+  }
+
+  /**
+   * Returns the config protos associated with the provider.
+   * @return const ConfigProtoVector the config protos corresponding to the Config instantiated by
+   *         the provider.
+   */
+  virtual const ConfigProtoVector getConfigProtos() const {
+    assert("not implemented" && false);
+    return {};
+  }
 
   /**
    * Returns the config version associated with the provider.
